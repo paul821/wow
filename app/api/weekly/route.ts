@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const tz = CFG.timezone;
   const nowZoned = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
-  const day = nowZoned.getDay(); // 0 Sun .. 6 Sat
+  const day = nowZoned.getDay();
   const mondayOffset = (day === 0 ? 6 : day - 1);
   const lastMonday = addDays(nowZoned, -(mondayOffset + 7));
   const lastSunday = addDays(nowZoned, -(mondayOffset + 1));
@@ -51,8 +51,18 @@ export async function GET(req: NextRequest) {
       if (res.ok) {
         const html = await res.text();
         const $ = loadHTML(html);
-        const main = $("main, article, .content, .workout, #content").text() || $("body").text();
-        text = (main || "").replace(/\s+/g, " ").trim().slice(0, 4000) || null;
+        let main =
+           $("main, article, [class*=workout], [id*=workout], .content, #content")
+             .find("h1,h2,h3,p,li,pre")
+             .map((_, el) => $(el).text())
+             .get()
+             .join("\n");
+        if (!main || main.replace(/\s+/g, " ").trim().length < 60) {
+           // fallback to meta description or whole body
+           const meta = $('meta[property="og:description"]').attr("content") || $("body").text();
+           main = meta || "";
+        }
+      const compact = (main || "").replace(/\s+/g, " ").trim();
       }
     } catch (_) {}
     pages.push({ date: d, url, text });
@@ -62,6 +72,7 @@ export async function GET(req: NextRequest) {
   for (const p of pages) {
     if (p.text) {
       const parsed = parseWodText(p.text);
+      if (!parsed.items || parsed.items.length === 0) continue;
       const failsJump = BAN_JUMP_ROPE(parsed);
       const failsBW   = bwOnly && parsed.requiresLoad;
       const failsRun  = noRunning && parsed.containsRunning;
