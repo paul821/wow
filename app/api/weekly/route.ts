@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const lastMonday = addDays(nowZoned, -(mondayOffset + 7));
   const lastSunday = addDays(nowZoned, -(mondayOffset + 1));
 
+
   const startStr = format(lastMonday, "yyyy-MM-dd");
   const endStr = format(lastSunday, "yyyy-MM-dd");
   const cacheKey = `${startStr}_${endStr}_${bwOnly}_${noRunning}`;
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
     dates.push(format(cursor, "yyyy/MM/dd"));
     cursor = addDays(cursor, 1);
   }
+
 
   const pages: { date: string; url: string; text: string | null }[] = [];
 
@@ -56,22 +58,27 @@ export async function GET(req: NextRequest) {
 
   const candidates: any[] = [];
   for (const p of pages) {
-    if (!p.text) {
-      // skip when no text
-    } else {
-      const parsed = parseWodText(p.text);
-      const failsJump = BAN_JUMP_ROPE(parsed);
-      const failsBW   = bwOnly && parsed.requiresLoad;
-      const failsRun  = noRunning && parsed.containsRunning;
-      const duration  = Math.min(60, inferDuration(parsed));
-      const failsCap  = duration > 60;
+  if (p.text) {
+    const parsed = parseWodText(p.text);
+    const failsJump = BAN_JUMP_ROPE(parsed);
+    const failsBW   = bwOnly && parsed.requiresLoad;
+    const failsRun  = noRunning && parsed.containsRunning;
+    const duration  = Math.min(60, inferDuration(parsed));
+    const failsCap  = duration > 60;
 
-      if (!(failsJump || failsBW || failsRun || failsCap)) {
-        const score = computeScore(parsed, { bwOnly, noRunning });
-        candidates.push({ ...parsed, date: p.date, source_url: p.url, est_duration_min: duration, score });
-      }
+    if (!(failsJump || failsBW || failsRun || failsCap)) {
+      const score = computeScore(parsed, { bwOnly, noRunning });
+      candidates.push({
+        ...parsed,
+        date: p.date,
+        source_url: p.url,
+        est_duration_min: duration,
+        score
+      });
     }
   }
+}
+
 
   let data: any;
   if (candidates.length > 0) {
