@@ -15,11 +15,12 @@ export async function GET(req: NextRequest) {
   const noRunning = searchParams.get("noRunning") === "true";
 
   const tz = CFG.timezone;
-  const nowZoned = utcToZonedTime(new Date(), tz);
+  const nowZoned = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
   const day = nowZoned.getDay(); // 0 Sun .. 6 Sat
   const mondayOffset = (day === 0 ? 6 : day - 1);
   const lastMonday = addDays(nowZoned, -(mondayOffset + 7));
   const lastSunday = addDays(nowZoned, -(mondayOffset + 1));
+
 
 
   const startStr = format(lastMonday, "yyyy-MM-dd");
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
   }
 
 
+
   const pages: { date: string; url: string; text: string | null }[] = [];
 
   for (const d of dates) {
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest) {
       const res = await fetch(url, { headers: { "User-Agent": CFG.userAgent }, next: { revalidate: 60 } });
       if (res.ok) {
         const html = await res.text();
-        const $ = cheerio.load(html);
+        const $ = loadHTML(html);
         const main = $("main, article, .content, .workout, #content").text() || $("body").text();
         text = (main || "").replace(/\s+/g, " ").trim().slice(0, 4000) || null;
       }
@@ -58,26 +60,27 @@ export async function GET(req: NextRequest) {
 
   const candidates: any[] = [];
   for (const p of pages) {
-  if (p.text) {
-    const parsed = parseWodText(p.text);
-    const failsJump = BAN_JUMP_ROPE(parsed);
-    const failsBW   = bwOnly && parsed.requiresLoad;
-    const failsRun  = noRunning && parsed.containsRunning;
-    const duration  = Math.min(60, inferDuration(parsed));
-    const failsCap  = duration > 60;
-
-    if (!(failsJump || failsBW || failsRun || failsCap)) {
-      const score = computeScore(parsed, { bwOnly, noRunning });
-      candidates.push({
-        ...parsed,
-        date: p.date,
-        source_url: p.url,
-        est_duration_min: duration,
-        score
-      });
+    if (p.text) {
+      const parsed = parseWodText(p.text);
+      const failsJump = BAN_JUMP_ROPE(parsed);
+      const failsBW   = bwOnly && parsed.requiresLoad;
+      const failsRun  = noRunning && parsed.containsRunning;
+      const duration  = Math.min(60, inferDuration(parsed));
+      const failsCap  = duration > 60;
+  
+      if (!(failsJump || failsBW || failsRun || failsCap)) {
+        const score = computeScore(parsed, { bwOnly, noRunning });
+        candidates.push({
+          ...parsed,
+          date: p.date,
+          source_url: p.url,
+          est_duration_min: duration,
+          score
+        });
+      }
     }
   }
-}
+
 
 
   let data: any;
