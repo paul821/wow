@@ -9,7 +9,9 @@ export function BAN_JUMP_ROPE(parsed:any){
 }
 
 export function computeScore(parsed:any, opts:{bwOnly:boolean, noRunning:boolean}){
-  const families = new Set(parsed.items.map((i:any)=> i.family));
+  const families: Set<string> = new Set<string>(
+    parsed.items.map((i: any) => String(i.family))
+  );
   const regions = new Set<string>();
   for (const f of families){
     if (f === "pull" || f === "press") { regions.add("upper"); regions.add("core"); }
@@ -50,7 +52,9 @@ export function buildRows(pick:any){
 
 export function REASONS(pick:any){
   const badges:string[] = [];
-  const fams = new Set(pick.items.map((i:any)=> i.family));
+  const fams: Set<string> = new Set<string>(
+    pick.items.map((i: any) => String(i.family))
+  );
   const regions = new Set<string>();
   for (const f of fams){
     if (f === "pull" || f === "press") { regions.add("upper"); regions.add("core"); }
