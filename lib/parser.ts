@@ -47,10 +47,10 @@ export function parseWodText(text: string) {
 
   const lines = lower
     .replace(/[^\x20-\x7E\n]/g, " ")
-    .split(/\n|\.|;|\r|\t/)
+    .split(/\n|\.|;|,|\/|\r|\t/)
     .map(s=>s.trim())
     .filter(Boolean)
-    .slice(0, 40);
+    .slice(0, 80);
 
   const items: MovementItem[] = [];
   let currentBlock = type === "unknown" ? undefined : type.toUpperCase();
@@ -65,8 +65,9 @@ export function parseWodText(text: string) {
 
     const equipment = EQUIP_HINTS.filter(([_, r])=> r.test(ln)).map(([k])=>k);
 
-    const dose = (ln.match(/(\d+\s*(reps?|cal|m|meters|km|minutes?|min|seconds?|sec|x|rft|rds|rounds?))/g)||[]).join(" ");
-
+    const dose = (
+       ln.match(/((\d{1,2}-){1,4}\d{1,2}|\d+\s*(reps?|cal|m|meters|km|minutes?|min|seconds?|sec)|\b(emom|amrap)\s*\d{1,2}|\d+\s*(x|rft|rds|rounds?))/g) || []
+     ).join(" ");
     const exercise = normalizeExercise(ln);
 
     items.push({ block: currentBlock, exercise, dose, family: fam, equipment });
@@ -98,7 +99,8 @@ function guessFamilyByHeadword(s: string): string | undefined {
 }
 
 function normalizeExercise(s: string) {
-  const m = s.match(/(burpees?|pull[- ]?ups?|chin[- ]?ups?|ring rows?|rope climbs?|muscle[- ]?ups?|deadlifts?|kb swings?|kettlebell swings?|good[- ]?mornings?|hip thrusts?|sdhp|sumo deadlift high pulls?|push[- ]?ups?|press(?:es)?|push press(?:es)?|jerks?|handstand push[- ]?ups?|dips?|squats?|thrusters?|wall ?balls?|lunges?|step[- ]?ups?|box jumps?|broad jumps?|sit[- ]?ups?|v[- ]?ups?|toes[- ]?to[- ]?bar|knee raises?|hollow rocks?|planks?|run|shuttle runs?|row|bike|ski)/);
+  const m = s.match(/(burpees?|devil's presses?|pull[- ]?ups?|chin[- ]?ups?|ring rows?|rope climbs?|muscle[- ]?ups?|deadlifts?|rdls?|kb swings?|kettlebell swings?|good[- ]?mornings?|hip thrusts?|sdhp|sumo deadlift high pulls?|push[- ]?ups?|strict presses?|press(?:es)?|push press(?:es)?|jerks?|handstand push[- ]?ups?|dips?|squats?|front squats?|back squats?|overhead squats?|ohs|thrusters?|wall ?balls?|lunges?|step[- ]?ups?|box jumps?|broad jumps?|sit[- ]?ups?|v[- ]?ups?|toes[- ]?to[- ]?bar|t2b|knee raises?|ghd sit[- ]?ups?|hollow rocks?|planks?|row|bike|ski|run|shuttle runs?)/);
+
   return m ? m[0] : s.split(",")[0].split(" with ")[0].slice(0,60);
 }
 
