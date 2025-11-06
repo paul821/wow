@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { format, addDays, isAfter } from "date-fns";
-import { utcToZonedTime } from "date-fns-tz";
-import cheerio from "cheerio";
+// no tz lib needed – use native timeZone conversion
+import { load as loadHTML } from "cheerio";
 import { WINDOWS, computeScore, buildRows, REASONS, BAN_JUMP_ROPE } from "@/lib/selector";
 import { parseWodText, inferDuration } from "@/lib/parser";
 import { evergreenPick } from "@/lib/evergreen";
