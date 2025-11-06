@@ -29,7 +29,7 @@ export function evergreenPick(opts:{bwOnly:boolean, noRunning:boolean}){
   ];
   const filtered = lib.filter(w => {
     if (opts.noRunning && w.items.some(i=> /run/.test(i.exercise))) return false;
-    if (opts.bwOnly && w.items.some(i=> ["pullup_bar"].includes("needs_equipment_placeholder"))) return false;
+    if (opts.bwOnly && w.items.some(i=> i.equipment.length > 0)) return false;
     return true;
   });
   return filtered[0] || lib[0];
