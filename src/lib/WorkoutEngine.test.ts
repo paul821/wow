@@ -79,13 +79,11 @@ describe('WorkoutEngine', () => {
       // Should have exactly 3 movements
       expect(workout.movements.length).toBe(3)
 
-      // Fetch exercises to verify movement patterns
-      const { data: allExercises } = await (await import('./supabase')).supabase
-        .from('exercises')
-        .select('*')
+      // Use static data to verify movement patterns
+      const { exercises: allExercises } = await import('./data')
 
       const exerciseMap = new Map(
-        (allExercises ?? []).map((ex: { id: string; movement_pattern: string }) => [ex.id, ex.movement_pattern])
+        allExercises.map((ex) => [ex.id, ex.movement_pattern])
       )
 
       const patterns = workout.movements.map((m) => {
@@ -110,12 +108,10 @@ describe('WorkoutEngine', () => {
       const workout = await engine.generateSmartWorkout(15, [])
 
       // All selected exercises should require no equipment
-      const { data: allExercises } = await (await import('./supabase')).supabase
-        .from('exercises')
-        .select('*')
+      const { exercises: allExercises } = await import('./data')
 
       const exerciseMap = new Map(
-        (allExercises ?? []).map((ex: { id: string; equipment_required: string[] }) => [ex.id, ex.equipment_required])
+        allExercises.map((ex) => [ex.id, ex.equipment_required])
       )
 
       workout.movements.forEach((m) => {
