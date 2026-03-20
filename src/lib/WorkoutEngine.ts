@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { exercises, workouts } from './data'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,16 +42,11 @@ export interface ClosestMatch {
 // ─── WorkoutEngine ───────────────────────────────────────────────────────────
 
 export class WorkoutEngine {
-  /**
-   * Filters exercises to those the user can perform with their available equipment.
-   * An exercise is valid if equipment_required is empty (bodyweight) or all
-   * required items are in the user's available equipment list.
-   */
   private filterExercisesByEquipment(
-    exercises: Exercise[],
+    allExercises: Exercise[],
     availableEquipment: string[]
   ): Exercise[] {
-    return exercises.filter((ex) => {
+    return allExercises.filter((ex) => {
       if (ex.equipment_required.length === 0) return true
       return ex.equipment_required.every((equip) =>
         availableEquipment.includes(equip)
@@ -59,35 +54,15 @@ export class WorkoutEngine {
     })
   }
 
-  /**
-   * Phase 1: Classic WOD Matcher
-   * Returns classic WODs from the DB that the user can fully perform
-   * with their available equipment.
-   */
-  async getMatchedWODs(availableEquipment: string[]): Promise<MatchedWODsResult> {
-    const { data: exercises, error: exError } = await supabase
-      .from('exercises')
-      .select('*')
-
-    if (exError) throw new Error(`Failed to fetch exercises: ${exError.message}`)
-
-    const { data: workouts, error: wodError } = await supabase
-      .from('workouts')
-      .select('*')
-
-    if (wodError) throw new Error(`Failed to fetch workouts: ${wodError.message}`)
-
-    // Build set of valid exercise IDs based on equipment
+  getMatchedWODs(availableEquipment: string[]): MatchedWODsResult {
     const validExerciseIds = new Set(
-      this.filterExercisesByEquipment(exercises as Exercise[], availableEquipment)
+      this.filterExercisesByEquipment(exercises, availableEquipment)
         .map((ex) => ex.id)
     )
 
-    // Build exercise name lookup and equipment lookup from all exercises
-    const exNameMap = new Map((exercises as Exercise[]).map(e => [e.id, e.name]))
-    const exEquipMap = new Map((exercises as Exercise[]).map(e => [e.id, e.equipment_required]))
+    const exNameMap = new Map(exercises.map(e => [e.id, e.name]))
+    const exEquipMap = new Map(exercises.map(e => [e.id, e.equipment_required]))
 
-    // Helper to enrich movements with exercise names
     const enrichWod = (wod: Workout) => ({
       ...wod,
       default_movements: wod.default_movements.map(m => ({
@@ -96,35 +71,26 @@ export class WorkoutEngine {
       })),
     })
 
-    // Filter to workouts where ALL movements use valid exercises
-    const doableWods = (workouts as Workout[]).filter((wod) =>
+    const doableWods = workouts.filter((wod) =>
       wod.default_movements.every((m) => validExerciseIds.has(m.exercise_id))
     )
 
-    // When equipment is selected, prefer WODs that actually USE it.
-    // Without this, bodyweight WODs (Loredo, etc.) always match regardless
-    // of what equipment is selected, drowning out relevant WODs.
     if (availableEquipment.length > 0) {
       const equipmentWods = doableWods.filter((wod) =>
         wod.default_movements.some((m) => {
           const equip = exEquipMap.get(m.exercise_id) ?? []
-          return equip.length > 0 // Movement requires at least some equipment
+          return equip.length > 0
         })
       )
       if (equipmentWods.length > 0) {
         return { wods: equipmentWods.map(enrichWod), isBodyweightFallback: false }
       }
-      // No WODs use the selected equipment — fall back to bodyweight
       return { wods: doableWods.map(enrichWod), isBodyweightFallback: true }
     }
 
     return { wods: doableWods.map(enrichWod), isBodyweightFallback: false }
   }
 
-  /**
-   * Phase 2: Template Stacker
-   * Creates a workout time block structure based on duration.
-   */
   generateTimeBlock(durationMinutes: number): GeneratedTimeBlock {
     let type: 'AMRAP' | 'EMOM' | 'For Time'
 
@@ -143,37 +109,23 @@ export class WorkoutEngine {
     }
   }
 
-  /**
-   * Balanced Movement Rule + Smart Workout Generator
-   * Generates a workout with balanced movement distribution:
-   * one push, one pull, and one squat/hinge movement.
-   * All selected exercises must be performable with the user's equipment.
-   */
-  async generateSmartWorkout(
+  generateSmartWorkout(
     durationMinutes: number,
     availableEquipment: string[]
-  ): Promise<GeneratedTimeBlock> {
+  ): GeneratedTimeBlock {
     const block = this.generateTimeBlock(durationMinutes)
 
-    const { data: exercises, error } = await supabase
-      .from('exercises')
-      .select('*')
-
-    if (error) throw new Error(`Failed to fetch exercises: ${error.message}`)
-
     const validExercises = this.filterExercisesByEquipment(
-      exercises as Exercise[],
+      exercises,
       availableEquipment
     )
 
-    // Bucket exercises by movement pattern category
     const pushExercises = validExercises.filter((e) => e.movement_pattern === 'push')
     const pullExercises = validExercises.filter((e) => e.movement_pattern === 'pull')
     const squatHingeExercises = validExercises.filter(
       (e) => e.movement_pattern === 'squat' || e.movement_pattern === 'hinge'
     )
 
-    // Pick one random exercise from each bucket
     const pickRandom = (arr: Exercise[]): Exercise | null =>
       arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null
 
@@ -192,33 +144,16 @@ export class WorkoutEngine {
     return block
   }
 
-  /**
-   * Phase 3: Filter Relaxation
-   * When no classic WOD matches exactly, find the closest matches
-   * and report which equipment is missing.
-   */
-  async getClosestMatchedWODs(
+  getClosestMatchedWODs(
     availableEquipment: string[]
-  ): Promise<ClosestMatch[]> {
-    const { data: exercises, error: exError } = await supabase
-      .from('exercises')
-      .select('*')
-
-    if (exError) throw new Error(`Failed to fetch exercises: ${exError.message}`)
-
-    const { data: workouts, error: wodError } = await supabase
-      .from('workouts')
-      .select('*')
-
-    if (wodError) throw new Error(`Failed to fetch workouts: ${wodError.message}`)
-
+  ): ClosestMatch[] {
     const exerciseMap = new Map(
-      (exercises as Exercise[]).map((ex) => [ex.id, ex])
+      exercises.map((ex) => [ex.id, ex])
     )
 
     const results: ClosestMatch[] = []
 
-    for (const wod of workouts as Workout[]) {
+    for (const wod of workouts) {
       const missingSet = new Set<string>()
 
       for (const movement of wod.default_movements) {
@@ -232,8 +167,6 @@ export class WorkoutEngine {
         }
       }
 
-      // Only include if there IS missing equipment (otherwise it's an exact match)
-      // and the gap isn't too large (at most 3 missing items)
       if (missingSet.size > 0 && missingSet.size <= 3) {
         results.push({
           wod,
@@ -242,16 +175,9 @@ export class WorkoutEngine {
       }
     }
 
-    // Sort by fewest missing items first (closest match)
     return results.sort((a, b) => a.missingEquipment.length - b.missingEquipment.length)
   }
 
-  /**
-   * Rep-Volume Scaling
-   * When substituting equipment, scale reps to maintain stimulus.
-   * Barbell → Dumbbell: +20% reps
-   * Dumbbell → None (bodyweight): +50% reps
-   */
   scaleRepVolume(
     reps: number | string,
     originalEquipment: string,
@@ -266,14 +192,13 @@ export class WorkoutEngine {
     } else if (originalEquipment === 'Barbell' && substitutedEquipment === 'None') {
       scaleFactor = 1.8
     } else {
-      return reps // Unknown substitution, return unchanged
+      return reps
     }
 
     if (typeof reps === 'number') {
       return Math.round(reps * scaleFactor)
     }
 
-    // Handle string rep schemes like "21-15-9"
     return reps
       .split('-')
       .map((r) => Math.round(parseInt(r, 10) * scaleFactor).toString())
