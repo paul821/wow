@@ -93,7 +93,8 @@ function App() {
     } catch (err) {
       console.error('Failed to generate workout:', err)
       setResult(null)
-      setError('Something went wrong generating your workout. Please try again.')
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to generate workout: ${message}`)
     } finally {
       setIsGenerating(false)
     }
