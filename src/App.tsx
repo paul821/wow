@@ -24,6 +24,7 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleCopy = useCallback(() => {
     if (!result) return
@@ -64,6 +65,7 @@ function App() {
   const handleGenerate = async () => {
     setIsGenerating(true)
     setFallbackMessage(null)
+    setError(null)
     try {
       const { WorkoutEngine } = await import('./lib/WorkoutEngine')
       const engine = new WorkoutEngine()
@@ -90,6 +92,8 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to generate workout:', err)
+      setResult(null)
+      setError('Something went wrong generating your workout. Please try again.')
     } finally {
       setIsGenerating(false)
     }
@@ -210,6 +214,22 @@ function App() {
                 className="w-5 h-5 border-2 rounded-full animate-spin"
                 style={{ borderColor: 'var(--color-border-subtle)', borderTopColor: 'var(--color-accent)' }}
               />
+            </div>
+          )}
+
+          {error && !isGenerating && (
+            <div
+              className="result-display animate-fade-in-up"
+              style={{
+                borderLeft: '3px solid #e53e3e',
+              }}
+            >
+              <p
+                className="text-sm tracking-wide"
+                style={{ color: '#e53e3e', fontFamily: 'var(--font-mono)' }}
+              >
+                {error}
+              </p>
             </div>
           )}
 
